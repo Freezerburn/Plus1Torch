@@ -158,36 +158,36 @@ class PlacedItem(private val screen: AsciiScreen) {
     internal var layer: Int = -1;
 
     var x: Int
-        get() = item.x;
-        set(v) = move(dx = v - x);
+        get() = item.x
+        set(v) = moveAbsolute(x = v)
     var y: Int
-        get() = item.y;
-        set(v) = move(dy = v - y);
+        get() = item.y
+        set(v) = moveAbsolute(y = v)
     var w: Int
-        get() = item.w;
-        set(v) = resize(dw = v - w);
+        get() = item.w
+        set(v) = resize(dw = v - w)
     var h: Int
         get() = item.h
-        set(v) = resize(dh = v - h);
+        set(v) = resize(dh = v - h)
 
     fun move(dx: Int = 0, dy: Int = 0) {
-        screen.actionQueue.add(QueuedAction.MovementAction(item, dx, dy));
+        screen.actionQueue.add(QueuedAction.MovementAction(item, dx, dy))
     }
 
-    fun moveAbsolute(x: Int = 0, y: Int = 0) {
-        screen.actionQueue.add(QueuedAction.MovementAction(item, x, y, absolute = true));
+    fun moveAbsolute(x: Int = item.x, y: Int = item.y) {
+        screen.actionQueue.add(QueuedAction.MovementAction(item, x, y, absolute = true))
     }
 
     fun resize(dw: Int = 0, dh: Int = 0) {
-        screen.actionQueue.add(QueuedAction.ResizeAction(item, dw, dh));
+        screen.actionQueue.add(QueuedAction.ResizeAction(item, dw, dh))
     }
 
-    fun resizeAbsolute(w: Int = 0, h: Int = 0) {
-        screen.actionQueue.add(QueuedAction.ResizeAction(item, w, h, absolute = true));
+    fun resizeAbsolute(w: Int = item.w, h: Int = item.h) {
+        screen.actionQueue.add(QueuedAction.ResizeAction(item, w, h, absolute = true))
     }
 
     fun remove() {
-        screen.actionQueue.add(QueuedAction.RemoveAction(item, layer));
+        screen.actionQueue.add(QueuedAction.RemoveAction(item, layer))
     }
 }
 
@@ -212,19 +212,38 @@ internal sealed class QueuedAction {
         hasRun = false
     }
 
+    abstract fun attempt(screen: AsciiScreen): Boolean;
     abstract internal fun run(screen: AsciiScreen);
     abstract fun undoInternal(screen: AsciiScreen);
 
     class PlacementAction(private val item: ItemData,
                           private val layer: Int) : QueuedAction() {
+        override fun attempt(screen: AsciiScreen): Boolean {
+            val placeLayer = screen.layers[layer]
+            // Make sure to check every position over all the width/height of the character when checking if something
+            // can be placed.
+            for (w in 0..item.w-1) {
+                for (h in 0..item.h-1) {
+                    val loc = get1d(item.x + w, item.y + h, screen.width)
+                    // Make sure the location is within bounds of the field.
+                    if (placeLayer.size <= loc) {
+                        return false
+                    }
+                    // If something exists in the spot we're attempting to place something into, we can't place
+                    // another thing there.
+                    placeLayer[loc] ?: return false
+                }
+            }
+            return true
+        }
+
         override fun run(screen: AsciiScreen) {
-            val loc = get1d(item.x, item.y, screen.width);
-            val existing = screen.layers[layer][loc];
-            // TODO: Implement placing a character.
-            //  This should take into account the size of the character along with allowing characters
-            //  to be placed "off screen" so that a moved camera might start to send them to be drawn
-            //  in the function passed to render.
-            throw UnsupportedOperationException()
+            val placeLayer = screen.layers[layer]
+            for (w in 0..item.w-1) {
+                for (h in 0..item.h-1) {
+                    placeLayer[get1d(item.x + w, item.y + h, screen.width)] = item
+                }
+            }
         }
 
         override fun undoInternal(screen: AsciiScreen) {
@@ -235,7 +254,12 @@ internal sealed class QueuedAction {
 
     class RemoveAction(private val item: ItemData,
                        private val layer: Int) : QueuedAction() {
+        override fun attempt(screen: AsciiScreen): Boolean {
+            return true
+        }
+
         override fun run(screen: AsciiScreen) {
+            // TODO: Remove all items across the width and height of the character.
             if(!screen.layers[layer].remove(item)) {
                 throw IllegalStateException("Cannot remove '$item' which does not exist.");
             }
@@ -248,6 +272,10 @@ internal sealed class QueuedAction {
 
     class DrawableChangeAction(private val item: ItemData,
                                private val newDraw: Char, private val oldDraw: Char) : QueuedAction() {
+        override fun attempt(screen: AsciiScreen): Boolean {
+            return true
+        }
+
         override fun run(screen: AsciiScreen) {
             throw UnsupportedOperationException()
         }
@@ -260,11 +288,21 @@ internal sealed class QueuedAction {
     class MovementAction(private val item: ItemData,
                          private val dx: Int, private val dy: Int,
                          private val absolute: Boolean = false) : QueuedAction() {
+        override fun attempt(screen: AsciiScreen): Boolean {
+            // TODO: Put code into place that allows other code to react when movement fails.
+            throw UnsupportedOperationException()
+        }
+
         override fun undoInternal(screen: AsciiScreen) {
             throw UnsupportedOperationException()
         }
 
         override fun run(screen: AsciiScreen) {
+            // TODO: Make sure to remove all old item placements before adding the new ones.
+            //  Likely it's not desirable to have a remove then a place queued instead of having a move, as that
+            //  might cause issues due to having two separate actions. Movement can also check that something can
+            //  move, and respond in some way based on the inability to move. (e.g.: attack a monster if you bump
+            //  into them)
             throw UnsupportedOperationException()
         }
     }
@@ -272,11 +310,18 @@ internal sealed class QueuedAction {
     class ResizeAction(private val item: ItemData,
                        private val dw: Int, private val dh: Int,
                        private val absolute: Boolean = false): QueuedAction() {
+        override fun attempt(screen: AsciiScreen): Boolean {
+            throw UnsupportedOperationException()
+        }
+
         override fun undoInternal(screen: AsciiScreen) {
             throw UnsupportedOperationException()
         }
 
         override fun run(screen: AsciiScreen) {
+            // TODO: Remove old item references before resizing.
+            //  Necessary if something becomes smaller. We don't want old references to an item in places that it
+            //  doesn't exist anymore due to becoming smaller.
             throw UnsupportedOperationException()
         }
     }
