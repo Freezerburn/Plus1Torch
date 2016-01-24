@@ -1,6 +1,8 @@
 package com.ud.quill.screen
 
 import sun.plugin.dom.exception.InvalidStateException
+import java.awt.Color
+import java.awt.Font
 import java.util.*
 
 /**
@@ -24,11 +26,59 @@ fun get1d(x: Int, y: Int, stride: Int): Int {
 }
 
 
-class AsciiScreen(internal var width: Int, internal var height: Int) {
-    internal val maxItemsPerLayer = width * height;
-    internal val pooledItems = ArrayList<ItemData>(maxItemsPerLayer * 3 + 1);
-    internal val pooledItemProxies = ArrayList<PlacedItem>(maxItemsPerLayer * 3 + 1);
+/**
+ * Manages a field of ascii characters to be drawn to a window. Automatically figures out the correct font(s) to use
+ * when drawing each character to make them look as good as possible, based on window size and the number of characters
+ * being drawn to the screen at a time from the field.
+ *
+ * Once a field is initialized, it can no longer be changed. A new AsciiScreen object will need to be allocated.
+ *
+ * The size of the window can be changed on the fly as a user resizes it. The AsciiScreen will figure out new fonts
+ * as necessary to handle the changing window. The same can be done for the number of characters being drawn to the
+ * screen.
+ *
+ * The AsciiScreen can handle characters that are difference sizes. Meaning a single character can end up taking a
+ * 2x2 space in the screen instead of just a 1x1 space like in a terminal. Oh the things we can do with modern
+ * rendering!
+ *
+ * @param width: Number of characters that can be stored left to right across the field.
+ * @param height: Number of characters that can be stored up to down across the field.
+ * @param charactersDrawnX: The number of characters to draw left to right in the window.
+ * @param charactersDrawnY: The number of characters to draw up to down in the window.
+ * @param windowWidth: The width of the window being rendered into.
+ * @param windowHeight: The height of the window being rendered into.
+ */
+class AsciiScreen(internal var width: Int, internal var height: Int,
+                  internal var charactersDrawnX: Int, internal var charactersDrawnY: Int,
+                  internal var windowWidth: Int, internal var windowHeight: Int) {
+    /**
+     * The number of items that fit on a single screen in a layer if every item was 1x1.
+     */
+    internal val itemsPerScreenPerLayer = width * height;
+
+    internal val initialPooledItems = itemsPerScreenPerLayer * 3 + 1
+
+    /**
+     * Allocated with enough capacity to hold 3 screens worth of items (if every item is 1x1) for every layer. Should
+     * give a nice amount of items to work with at first. This value might need to be tuned going forward depending
+     * on how many screens worth of items tend to be created.
+     */
+    internal val pooledItems = ArrayList<ItemData?>(initialPooledItems);
+
+    /**
+     * Allocated with enough capacity to hold the same number of pre-allocated items, as each item gets wrapped in
+     * a proxy so that externally nothing has to worry about finicky details such as queueing up actions. It just
+     * provides a nice API. Items are purely internal instead of being an outward-facing API.
+     */
+    internal val pooledItemProxies = ArrayList<PlacedItem?>(initialPooledItems);
+
+    /**
+     * The actions that need to be resolved before rendering can take place. This includes things such as placing
+     * new items, moving items, etc. The default size might need to be changed based on how many actions tend to
+     * get queued for most frames to reduce GC pressure from an internal buffer being reallocated.
+     */
     internal val actionQueue = ArrayList<QueuedAction>(50);
+
     /**
      * Three layers: Background, Main ("play" area), UI
      *
@@ -42,22 +92,27 @@ class AsciiScreen(internal var width: Int, internal var height: Int) {
      */
     internal val layers = ArrayList<ArrayList<ItemData?>>(ScreenLayer.UI.layer);
 
+    // How fonts work internally will likely change. Just a single font is likely simplistic when items can be larger
+    // than 1x1. A double size font is likely desired if something is 2x2, for example.
+    // TODO: Figure out font handling so every drawn character will look nice, regardless of width and height.
+
     init {
-        for(i in 0..(maxItemsPerLayer * 3)) {
+        for(i in 0..initialPooledItems-1) {
             pooledItems.add(ItemData(' ', -1, -1, -1, -1));
             pooledItemProxies.add(PlacedItem(this));
         }
         for(i in 0..ScreenLayer.UI.layer) {
-            layers.add(ArrayList<ItemData?>(maxItemsPerLayer));
-            for(j in 0..maxItemsPerLayer) {
-                layers[j].add(null);
-            }
+            layers.add(ArrayList<ItemData?>(itemsPerScreenPerLayer));
         }
     }
 
-    fun place(c: Char, x: Int, y: Int, w: Int = 1, h: Int = 1, layer: ScreenLayer = ScreenLayer.PLAY): PlacedItem {
-        val item = pooledItems.pop();
-        var wrapper = pooledItemProxies.pop();
+    fun place(c: Char, x: Int, y: Int,
+              w: Int = 1, h: Int = 1,
+              fg: Color = Color.WHITE, bg: Color = Color.BLACK,
+              attributes: Int = 0,
+              layer: ScreenLayer = ScreenLayer.PLAY): PlacedItem {
+        val item = pooledItems.pop() ?: ItemData(' ', -1, -1, -1, -1);
+        var wrapper = pooledItemProxies.pop() ?: PlacedItem(this);
         wrapper.item = item;
         wrapper.layer = layer.layer;
         actionQueue.add(QueuedAction.PlacementAction(
@@ -71,16 +126,30 @@ class AsciiScreen(internal var width: Int, internal var height: Int) {
             throw InvalidStateException("Cannot clear the screen when actions are queued!");
         }
         layers.forEach {
-            it.forEach { it ?: pooledItems.add(it!!) }
+            it.forEach { if (it != null) { pooledItems.add(it) } }
             it.clear()
         }
     }
 
-    fun render() {
-        resolveActions();
+    fun render(f: (Char, Int, Int, Font) -> Unit) {
+        resolveActions()
+        // TODO: Handle characters of different sizes.
+        //  This should be done by calculating the end size of the character and somehow making sure
+        //  the function renders the character at that size.
+        layers.forEach {
+            it.forEach {
+                it?.let {
+//                    f(it.toDraw, it.x, it.y, font)
+                }
+            }
+        }
     }
 
     private fun resolveActions() {
+        // TODO: Implement resolving queued actions for a screen.
+        //  What order do things need to be resolved in to make this work correctly?
+        //  What special considerations about actions need to be taken into account?
+        //   e.g.: If something is moved, it should be undone if it collides with something?
     }
 }
 
@@ -137,6 +206,10 @@ internal sealed class QueuedAction {
             throw IllegalStateException("Cannot undo an action that has not been run.");
         }
         undoInternal(screen);
+        // We can run an action again after it has been undone, since it will be like it never happened.
+        // Hopefully this doesn't have to be made use of very often.
+        // But I could see a use in backing a change out temporarily for some reason.
+        hasRun = false
     }
 
     abstract internal fun run(screen: AsciiScreen);
@@ -147,10 +220,15 @@ internal sealed class QueuedAction {
         override fun run(screen: AsciiScreen) {
             val loc = get1d(item.x, item.y, screen.width);
             val existing = screen.layers[layer][loc];
+            // TODO: Implement placing a character.
+            //  This should take into account the size of the character along with allowing characters
+            //  to be placed "off screen" so that a moved camera might start to send them to be drawn
+            //  in the function passed to render.
             throw UnsupportedOperationException()
         }
 
         override fun undoInternal(screen: AsciiScreen) {
+            // TODO: Implement undoing a placed character.
             throw UnsupportedOperationException()
         }
     }
