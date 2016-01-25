@@ -1,14 +1,14 @@
-package com.ud.quill
+package com.ud.plus1torch
 
 import com.badlogic.gdx.ApplicationListener
-import com.ud.quill.screen.AsciiScreen
+import com.ud.plus1torch.screen.AsciiScreen
 
 /**
  * Created by vince_000 on 11/16/2015.
  */
 
 
-public class QuillGame : ApplicationListener {
+public class TorchTestGame : ApplicationListener {
     val screen = AsciiScreen(100, 100, 80, 20, 640, 480);
 
     override fun create() {
@@ -22,10 +22,7 @@ public class QuillGame : ApplicationListener {
     }
 
     override fun render() {
-        screen.render { c, x, y, font ->
-            // Render each character that the screen has decided to render.
-            // TODO: Put together a libgdx string renderer.
-        }
+        // TODO: Put together a libgdx string renderer.
     }
 
     override fun resume() {

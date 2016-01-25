@@ -1,4 +1,4 @@
-package com.ud.quill
+package com.ud.plus1torch
 
 import com.badlogic.gdx.backends.lwjgl.LwjglApplication
 import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration
@@ -14,5 +14,5 @@ fun main(args: Array<String>) {
     config.resizable = false
     config.width = 640
     config.height = 480
-    LwjglApplication(QuillGame(), config)
+    LwjglApplication(TorchTestGame(), config)
 }
