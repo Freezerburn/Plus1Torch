@@ -1,6 +1,9 @@
 package com.ud.plus1torch
 
 import com.badlogic.gdx.ApplicationListener
+import com.badlogic.gdx.graphics.g2d.BitmapFont
+import com.badlogic.gdx.graphics.g2d.GlyphLayout
+import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.ud.plus1torch.screen.AsciiScreen
 
 /**
@@ -10,6 +13,9 @@ import com.ud.plus1torch.screen.AsciiScreen
 
 public class TorchTestGame : ApplicationListener {
     val screen = AsciiScreen(100, 100, 80, 20, 640, 480);
+    val batch = SpriteBatch()
+    val font = BitmapFont()
+    val layout = GlyphLayout()
 
     override fun create() {
         // TODO: Initialize some basic rendering capabilities.

@@ -121,9 +121,33 @@ fun get1d(x: Int, y: Int, stride: Int): Int {
  *  by creating more AsciiScreen objects and drawing them instead of the others. (keep a stack even, so that when one
  *  screen is left, the previous screen is drawn again)
  * TODO: Add in a way to control a camera that moves around the field.
+ * TODO: Ability to tween camera.
+ *  This would be a couple things at least: ability to pan the camera by defining a tween from one location to another,
+ *  and ability to zoom camera by specifying new zoom level. This should probably include two modes: one mode does the
+ *  tweening smoothly like in a normal 2D game with graphics, and the other would be to tween by moving entire character
+ *  blocks at a time.
  * TODO: Change some ArrayLists to use pure arrays is if makes sense.
  *  It makes sense if we don't need to expand the array at any point during runtime. This is likely to only apply to
  *  the data in the field. Other lists need to be able to handle any number of things that change at runtime.
+ * TODO: Add a way to query about what is in a location in any layer.
+ * TODO: Add another layer that can be interacted with but doesn't cause collision.
+ *  This would be a kind of "floor" layer. Because the bottom layer is decorational and non-colliding, we need another
+ *  layer that things like items can be collected into. Maybe? Could that kind of thing be built into the current system
+ *  by just changing the visible icon of the decorational layer and then query about what's in it?
+ * TODO: Add a user data object for any item?
+ * TODO: Add a way to find the nearest place to a location that an item can be placed in a layer?
+ * TODO: Add a method for finding a path from one location to another?
+ * TODO: Add a method for drawing a line from one location to another of a given color?
+ *  Can an API be put together that supports any given shape in the Java standard library for drawing things?
+ * TODO: Particle engine?
+ *  Never made a particle engine, might need some research into a good way to create one?
+ * TODO: Good interop with Java.
+ *  This will possibly require using the annotations that Kotlin provides to make sure names and fields and whatnot
+ *  are all compiled in a way that works nicely with Java. Not sure if this will require all that much work, but it
+ *  would be a very good thing to have for people who don't want to/can't use Kotlin.
+ * TODO: Load fonts in a framework-agnostic way.
+ *  How do I even do this? libgdx uses pre-created files to create BitmapFonts rather than using Java fonts, for
+ *  example. And it uses its own API to load the fonts from a resources folder, etc.
  *
  * @param width: Number of characters that can be stored left to right across the field.
  * @param height: Number of characters that can be stored up to down across the field.
@@ -141,7 +165,7 @@ fun get1d(x: Int, y: Int, stride: Int): Int {
 class AsciiScreen(internal var width: Int, internal var height: Int,
                   charactersDrawnX: Int, charactersDrawnY: Int,
                   windowWidth: Int, windowHeight: Int,
-                  internal val uiOnly: Boolean = false,
+                  public val uiOnly: Boolean = false,
                   internal val debug: Boolean = false) {
     /**
      * The number of characters that will be drawn from left to right in this AsciiScreen.
@@ -153,7 +177,6 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
          */
         set(value) {
             field = value
-            // TODO: Modify fonts and whatnot based on the new number of characters being drawn.
         }
 
     /**
@@ -166,7 +189,6 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
          */
         set(value) {
             field = value
-            // TODO: Modify fonts and whatnot based on the new number of characters being drawn.
         }
 
     /**
@@ -179,7 +201,6 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
          */
         set(value) {
             field = value
-            // TODO: Modify fonts and whatnot based on the new width of the drawable area.
         }
 
     /**
@@ -192,7 +213,6 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
          */
         set(value) {
             field = value
-            // TODO: Modify fonts and whatnot based on the new height of the drawable area.
         }
 
     /**
@@ -213,12 +233,9 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     internal val pooledItems = ArrayList<ItemData>(initialPooledItems)
 
     /**
-     * Allocated with enough capacity to hold the same number of pre-allocated items, as each item gets wrapped in
-     * a proxy so that externally nothing has to worry about finicky details such as queueing up actions. It just
-     * provides a nice API. Items are purely internal instead of being an outward-facing API.
+     * An allocated draw data that can be reused between every call to the render function. Instead of creating a new
+     * object for ever render call. Save some CPU and GC cycles.
      */
-    internal val pooledItemProxies = ArrayList<PlacedItem>(initialPooledItems)
-
     internal val reusableDrawData = CharDrawData()
 
     /**
@@ -244,14 +261,9 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     internal var cameraX = 0
     internal var cameraY = 0
 
-    // How fonts work internally will likely change. Just a single font is likely simplistic when items can be larger
-    // than 1x1. A double size font is likely desired if something is 2x2, for example.
-    // TODO: Figure out font handling so every drawn character will look nice, regardless of width and height.
-
     init {
         for(i in 0..initialPooledItems-1) {
-            pooledItems.add(ItemData(' ', -1, -1, -1, -1))
-            pooledItemProxies.add(PlacedItem(this))
+            pooledItems.add(ItemData())
         }
         if (uiOnly) {
             layers.add(ArrayList<ItemData?>(itemsPerLayer))
@@ -274,21 +286,21 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
               w: Int = 1, h: Int = 1,
               fg: Color = Color.WHITE, bg: Color = Color.BLACK,
               attributes: Int = 0, attributeArgs: Map<String, Any?> = HashMap<String, Any?>(),
+              userData: Any? = null,
               layer: ScreenLayer = if (uiOnly) ScreenLayer.UI else ScreenLayer.PLAY): PlacedItem {
         if (debug && uiOnly && layer != ScreenLayer.UI) {
             throw IllegalArgumentException("A UI-only AsciiScreen got non-UI layer for placement: $layer")
         }
 
         // TODO: Handle attributes and their arguments.
-        // TODO: Handle foreground and background colors.
 
-        val item = pooledItems.pop() ?: ItemData(' ', -1, -1, -1, -1);
-        var wrapper = pooledItemProxies.pop() ?: PlacedItem(this);
+        val item = pooledItems.pop() ?: ItemData();
+        var wrapper = PlacedItem(this);
         val layerInt = if (uiOnly) 0 else layer.layer
         wrapper.item = item;
         wrapper.layer = layerInt;
         actionQueue.add(QueuedAction.PlacementAction(
-                item(c, x, y, w, h), layerInt
+                item(c, x, y, w, h, fg, bg, userData), layerInt
         ));
         return wrapper;
     }
@@ -303,23 +315,23 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         }
     }
 
-    fun render(f: (Char, Int, Int, Font) -> Unit) {
+    fun render(f: (CharDrawData) -> Unit) {
         resolveActions()
+
         // TODO: Handle characters of different sizes.
         //  This should be done by calculating the end size of the character and somehow making sure
         //  the function renders the character at that size.
-        // TODO: Somehow represent the information necessary for drawing a character in a friendly way.
-        //  Basically I don't want any function that is called for rendering to having to deal with all sorts of
-        //  complexity due to the various options that are available to be used when placing a character. As much
-        //  as possible I want something relatively abstract and easy to use to be given to the render function
-        //  to keep the logic in it to a minimum and keep it able to run pretty fast.
-        // ? How do we handle drawing borders in a nice way?
-        // TODO: Only iterate over the possible item data in the camera.
+        val charW = windowWidth / charactersDrawnX
+        val charH = windowHeight / charactersDrawnY
         layers.forEach {
-            it.forEach {
-                it?.let {
-                    // TODO: Build the reusable draw data to pass to render function.
-//                    f(it.toDraw, it.x, it.y, font)
+            for (x in cameraX..charactersDrawnX-1) {
+                for (y in cameraY..charactersDrawnY-1) {
+                    it[get1d(x, y, width)]?.let {
+                        // fonts can be forced into a non-null value at this point since there should be no way it
+                        // isn't non-null here. We build them before going into this loop, and any resolved placements
+                        // will just re-build them.
+                        f(reusableDrawData(it, charW, charH))
+                    }
                 }
             }
         }
@@ -390,6 +402,16 @@ public class CharDrawData {
             field = value
         }
 
+    public var w: Int = 0
+        internal set(value) {
+            field = value
+        }
+
+    public var h: Int = 0
+        internal set(value) {
+            field = value
+        }
+
     public var fg: Color = Color.WHITE
         internal set(value) {
             field = value
@@ -405,8 +427,42 @@ public class CharDrawData {
         internal set(value) {
             field = value
         }
+
+    public var userData: Any? = null
+        internal set(value) {
+            field = value
+        }
+
+    internal operator fun invoke(item: ItemData, w: Int, h: Int): CharDrawData {
+        return this(item.toDraw, item.x, item.y, w * item.w, h * item.h, item.fg, item.bg, arrayOf<Line2D>(), item.userData)
+    }
+
+    internal operator fun invoke(newC: Char,
+                                 newX: Int, newY: Int,
+                                 newW: Int, newH: Int,
+                                 newFg: Color, newBg: Color,
+                                 newBorders: Array<Line2D>,
+                                 newUserData: Any?): CharDrawData {
+        c = newC
+        x = newX
+        y = newY
+        w = newW
+        h = newH
+        fg = newFg
+        bg = newBg
+        borders = newBorders
+        userData = newUserData
+        return this
+    }
 }
 
+// TODO: Put code into place that allows other code to react when movement fails.
+// TODO: Inform external code of various things that have happened (such as failing movement or placement) so it can react to it.
+//  This is necessary for various things, such as if movement fails due to colliding with another item, then external
+//  code will want to resolve that in some way. Such as dealing damage between two entities if one of them is the player
+//  and the other is a monster. Placing would also be useful to be informed about, so that if doing so fails, it gets
+//  a chance to put something into another location. (e.g.: if trying to generate a room or an item needs a location to
+//  be placed, but has to do a couple iterations to figure out where it needs to be placed)
 internal sealed class QueuedAction {
     private var hasRun = false;
 
@@ -475,8 +531,9 @@ internal sealed class QueuedAction {
         }
 
         override fun run(screen: AsciiScreen) {
-            // TODO: Remove all items across the width and height of the character.
-            if(!screen.layers[layer].remove(item)) {
+            var found = false
+            screen.layers[layer].replaceAll { if (it === item) { found = true; null } else it }
+            if(screen.debug && !found) {
                 throw IllegalStateException("Cannot remove '$item' which does not exist.");
             }
         }
@@ -505,7 +562,6 @@ internal sealed class QueuedAction {
                          private val dx: Int, private val dy: Int,
                          private val absolute: Boolean = false) : QueuedAction() {
         override fun attempt(screen: AsciiScreen): Boolean {
-            // TODO: Put code into place that allows other code to react when movement fails.
             throw UnsupportedOperationException()
         }
 
@@ -545,15 +601,21 @@ internal sealed class QueuedAction {
 
 internal class ItemData(var toDraw: Char,
                         var x: Int, var y: Int,
-                        var w: Int, var h: Int) {
-    constructor() : this(' ', -1, -1, -1, -1) {}
+                        var w: Int, var h: Int,
+                        var fg: Color, var bg: Color,
+                        var userData: Any?) {
+    constructor() : this(' ', -1, -1, -1, -1, Color.WHITE, Color.BLACK, null) {}
 
-    operator fun invoke(newDraw: Char, newX: Int, newY: Int, newW: Int, newH: Int): ItemData {
+    operator fun invoke(newDraw: Char, newX: Int, newY: Int, newW: Int, newH: Int,
+                        newFg: Color, newBg: Color, newUserData: Any?): ItemData {
         toDraw = newDraw;
-        x = newX;
-        y = newY;
-        w = newW;
-        h = newH;
+        x = newX
+        y = newY
+        w = newW
+        h = newH
+        fg = newFg
+        bg = newBg
+        userData = newUserData
         return this;
     }
 }
