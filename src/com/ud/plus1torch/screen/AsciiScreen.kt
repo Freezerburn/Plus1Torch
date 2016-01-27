@@ -16,13 +16,20 @@ enum class ScreenLayer(val layer: Int) {
     UI(2)
 }
 
+public val TEXT_BLINKING_DELAY_ARG_NAME = "BlinkingDelayMilliseconds"
+private val TEXT_BLINKING_DELAY_DEFAULT: Int = 500
 public val TEXT_BLINKING = 0x0001
 
 // Since this engine isn't ACTUALLY a terminal, we can do things that aren't possible to do in a terminal, such as put
 // borders around a character.
 // Can accept an extra attribute argument with the color a border should be drawn as. If not set, then the background
 // color will be used as the default.
-public val TEXT_BORDER_COLOR_ARG_NAME = "BorderColorArgument"
+public val TEXT_BORDER_COLOR_RIGHT_ARG_NAME = "BorderColorArgumentRight"
+public val TEXT_BORDER_COLOR_LEFT_ARG_NAME = "BorderColorArgumentLeft"
+public val TEXT_BORDER_COLOR_TOP_ARG_NAME = "BorderColorArgumentTop"
+public val TEXT_BORDER_COLOR_BOTTOM_ARG_NAME = "BorderColorArgumentBottom"
+public val TEXT_BORDER_COLOR_ALL_ARG_NAME = "BorderColorArgumentAll"
+private val TEXT_BORDER_COLOR_DEFAULT = Color.WHITE
 public val TEXT_BORDER_RIGHT = 0x0002
 public val TEXT_BORDER_LEFT = 0x0004
 public val TEXT_BORDER_TOP = 0x0008
@@ -42,6 +49,10 @@ public val TEXT_BORDER_ALL = TEXT_BORDER_RIGHT or TEXT_BORDER_LEFT or TEXT_BORDE
 //    ## -> ╚═
 //  etc.
 public val TEXT_AUTO_FANCY_WALL = 0x0020
+public val TEXT_FANCY_WALL_PREFER_SINGLE_ARG_NAME = "FancyWallPreferSingle"
+public val TEXT_FANCY_WALL_PREFER_DOUBLE_ARG_NAME = "FancyWallPreferDouble"
+public val TEXT_FANCY_WALL_ONLY_BORDERS_ARG_NAME = "FancyWallBorderOnly"
+public val TEXT_FANCY_WALL_INCLUDE_BORDERS_ARG_NAME = "FancyWallIncludeBorders"
 
 /**
  * Every character in Code Page 437, in the order they are defined in. Excluding the first character, as there
@@ -93,6 +104,10 @@ fun <T> ArrayList<T>.pop(): T? {
 
 fun get1d(x: Int, y: Int, stride: Int): Int {
     return x + y * stride;
+}
+
+infix fun Int.bitSet(other: Int): Boolean {
+    return other and this == other
 }
 
 
@@ -153,8 +168,8 @@ fun get1d(x: Int, y: Int, stride: Int): Int {
  * @param height: Number of characters that can be stored up to down across the field.
  * @param charactersDrawnX: The number of characters to draw left to right in the window.
  * @param charactersDrawnY: The number of characters to draw up to down in the window.
- * @param windowWidth: The width of the window being rendered into.
- * @param windowHeight: The height of the window being rendered into.
+ * @param renderWidth: The width of the window being rendered into.
+ * @param renderHeight: The height of the window being rendered into.
  * @param uiOnly: Whether or not to put this AsciiScreen into a mode that only has a single layer for the UI. Allocates
  * fewer object, but should not be used for a screen that has a play area. Defaults to false.
  * @param debug: Enables some extra checks/printing/exceptions such that improper use of the AsciiScreen or anything
@@ -164,7 +179,7 @@ fun get1d(x: Int, y: Int, stride: Int): Int {
  */
 class AsciiScreen(internal var width: Int, internal var height: Int,
                   charactersDrawnX: Int, charactersDrawnY: Int,
-                  windowWidth: Int, windowHeight: Int,
+                  renderWidth: Int, renderHeight: Int,
                   public val uiOnly: Boolean = false,
                   internal val debug: Boolean = false) {
     /**
@@ -194,7 +209,7 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     /**
      * The width of the area of the screen that this AsciiScreen will be drawn into. This can be changed.
      */
-    public var windowWidth = windowWidth
+    public var windowWidth = renderWidth
         /**
          * Change the width in pixels that this screen is drawing into. This will change how big each characters is
          * that gets drawn in the game window.
@@ -206,7 +221,7 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     /**
      * The height of the area of the screen that this AsciiScreen will be drawn into. This can be changed.
      */
-    public var windowHeight = windowHeight
+    public var windowHeight = renderHeight
         /**
          * Change the height in pixels that this screen is drawing into. This will change how big each characters is
          * that gets drawn in the game window.
@@ -300,7 +315,7 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         wrapper.item = item;
         wrapper.layer = layerInt;
         actionQueue.add(QueuedAction.PlacementAction(
-                item(c, x, y, w, h, fg, bg, userData), layerInt
+                item(c, x, y, w, h, fg, bg, userData, attributes, attributeArgs, debug), layerInt
         ));
         return wrapper;
     }
@@ -318,18 +333,12 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     fun render(f: (CharDrawData) -> Unit) {
         resolveActions()
 
-        // TODO: Handle characters of different sizes.
-        //  This should be done by calculating the end size of the character and somehow making sure
-        //  the function renders the character at that size.
         val charW = windowWidth / charactersDrawnX
         val charH = windowHeight / charactersDrawnY
         layers.forEach {
             for (x in cameraX..charactersDrawnX-1) {
                 for (y in cameraY..charactersDrawnY-1) {
                     it[get1d(x, y, width)]?.let {
-                        // fonts can be forced into a non-null value at this point since there should be no way it
-                        // isn't non-null here. We build them before going into this loop, and any resolved placements
-                        // will just re-build them.
                         f(reusableDrawData(it, charW, charH))
                     }
                 }
@@ -388,50 +397,32 @@ public class PlacedItem(private val screen: AsciiScreen) {
 
 public class CharDrawData {
     public var c: Char = ' '
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var x: Int = 0
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var y: Int  = 0
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var w: Int = 0
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var h: Int = 0
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var fg: Color = Color.WHITE
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var bg: Color = Color.BLACK
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var borders: Array<Line2D> = arrayOf()
         get() = field.copyOf() // Ensure internal array isn't mucked about with.
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     public var userData: Any? = null
-        internal set(value) {
-            field = value
-        }
+        internal set
 
     internal operator fun invoke(item: ItemData, w: Int, h: Int): CharDrawData {
         return this(item.toDraw, item.x, item.y, w * item.w, h * item.h, item.fg, item.bg, arrayOf<Line2D>(), item.userData)
@@ -599,15 +590,33 @@ internal sealed class QueuedAction {
     }
 }
 
+data class BorderLine(val x1: Int, val y1: Int, val x2: Int, val y2: Int)
+internal data class BorderData(val line: BorderLine, val color: Color)
+
 internal class ItemData(var toDraw: Char,
                         var x: Int, var y: Int,
                         var w: Int, var h: Int,
                         var fg: Color, var bg: Color,
                         var userData: Any?) {
+
+    var blinkText = false
+    var blinkTextRate = TEXT_BLINKING_DELAY_DEFAULT
+
+    var drawBorder = false
+    var borders: MutableList<BorderData>? = null
+
+    var autoFancyWall = false
+    var preferSingleLine = false
+    var preferDoubleLine = false
+    var fancyWallOnlyBorder = false
+    var fancyWallIncludeBorder = false
+
     constructor() : this(' ', -1, -1, -1, -1, Color.WHITE, Color.BLACK, null) {}
 
     operator fun invoke(newDraw: Char, newX: Int, newY: Int, newW: Int, newH: Int,
-                        newFg: Color, newBg: Color, newUserData: Any?): ItemData {
+                        newFg: Color, newBg: Color, newUserData: Any?,
+                        attributes: Int, attributeArgs: Map<String, Any?>,
+                        debug: Boolean): ItemData {
         toDraw = newDraw;
         x = newX
         y = newY
@@ -616,6 +625,94 @@ internal class ItemData(var toDraw: Char,
         fg = newFg
         bg = newBg
         userData = newUserData
+        buildAttributes(attributes, attributeArgs, debug)
         return this;
+    }
+
+    private fun buildAttributes(attributes: Int, attributeArgs: Map<String, Any?>, debug: Boolean) {
+        if (attributes and TEXT_BLINKING == TEXT_BLINKING) {
+            blinkText = true
+            val rate = attributeArgs[TEXT_BLINKING_DELAY_ARG_NAME]
+            blinkTextRate = if (rate is Int) rate else null ?: blinkTextRate
+        }
+
+        if (attributes bitSet TEXT_BORDER_LEFT) {
+            addBorder(attributeArgs, TEXT_BORDER_COLOR_LEFT_ARG_NAME, BorderLine(x, y, x, y + h), debug)
+        }
+        if (attributes bitSet TEXT_BORDER_RIGHT) {
+            addBorder(attributeArgs, TEXT_BORDER_COLOR_RIGHT_ARG_NAME, BorderLine(x + w, y, x + w, y + h), debug)
+        }
+        if (attributes bitSet TEXT_BORDER_TOP) {
+            addBorder(attributeArgs, TEXT_BORDER_COLOR_TOP_ARG_NAME, BorderLine(x, y, x + w, y), debug)
+        }
+        if (attributes bitSet TEXT_BORDER_BOTTOM) {
+            addBorder(attributeArgs, TEXT_BORDER_COLOR_BOTTOM_ARG_NAME, BorderLine(x, y + h, x + w, y + h), debug)
+        }
+
+        if (attributes bitSet TEXT_AUTO_FANCY_WALL) {
+            autoFancyWall = true
+            val single = attributeArgs[TEXT_FANCY_WALL_PREFER_SINGLE_ARG_NAME]
+            var double = attributeArgs[TEXT_FANCY_WALL_PREFER_DOUBLE_ARG_NAME]
+            var onlyBorder = attributeArgs[TEXT_FANCY_WALL_ONLY_BORDERS_ARG_NAME]
+            var includeBorder = attributeArgs[TEXT_FANCY_WALL_INCLUDE_BORDERS_ARG_NAME]
+
+            if (debug) {
+                if (single != null && single !is Boolean) {
+                    throw IllegalArgumentException("Got a single wall preference argument that was not a boolean: $single")
+                }
+                if (double != null && double !is Boolean) {
+                    throw IllegalArgumentException("Got a double wall preference argument that was not a boolean: $double")
+                }
+                if (onlyBorder != null && onlyBorder !is Boolean) {
+                    throw IllegalArgumentException("Got an only border argument that was not a boolean: $onlyBorder")
+                }
+                if (includeBorder != null && includeBorder !is Boolean) {
+                    throw IllegalArgumentException("Got an include border argument that was not a boolean: $includeBorder")
+                }
+
+                if (single != null && double != null && single is Boolean && double is Boolean) {
+                    if (single && double) {
+                        throw IllegalArgumentException("Cannot prefer both single line and double line fancy walls.")
+                    }
+                }
+                if (onlyBorder != null && includeBorder != null && onlyBorder is Boolean && includeBorder is Boolean) {
+                    if (onlyBorder && includeBorder) {
+                        throw IllegalArgumentException("Cannot have fancy walls be only borders and include borders.")
+                    }
+                }
+            }
+
+            if (single != null && single is Boolean && single) {
+                preferSingleLine = single
+            }
+            else if (double != null && double is Boolean && double) {
+                preferDoubleLine = double
+            }
+            if (onlyBorder != null && onlyBorder is Boolean && onlyBorder) {
+                fancyWallOnlyBorder = onlyBorder
+            }
+            else if (includeBorder != null && includeBorder is Boolean && includeBorder) {
+                fancyWallIncludeBorder = includeBorder
+            }
+        }
+    }
+
+    private fun addBorder(attributeArgs: Map<String, Any?>, arg: String, line: BorderLine,
+                          debug: Boolean) {
+        if (debug) {
+            if (attributeArgs[arg] != null && attributeArgs[arg] !is Color) {
+                throw IllegalArgumentException("Got an argument for border '$arg' that was non-null and not a color: ${attributeArgs[arg]}")
+            }
+            if (attributeArgs[TEXT_BORDER_COLOR_ALL_ARG_NAME] != null && attributeArgs[TEXT_BORDER_COLOR_ALL_ARG_NAME] !is Color) {
+                throw IllegalArgumentException("Got an argument for border 'ALL' that was non-null and not a color: ${attributeArgs[TEXT_BORDER_COLOR_ALL_ARG_NAME]}")
+            }
+        }
+
+        if (borders == null) {
+            borders = ArrayList(4)
+        }
+        drawBorder = true
+        val color = attributeArgs[arg] ?: attributeArgs[TEXT_BORDER_COLOR_ALL_ARG_NAME]
+        borders?.add(BorderData(line, if (color is Color) color else null ?: TEXT_BORDER_COLOR_DEFAULT))
     }
 }
