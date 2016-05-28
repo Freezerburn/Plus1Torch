@@ -567,11 +567,11 @@ internal sealed class QueuedAction {
         }
 
         override fun run(screen: AsciiScreen) {
-            throw UnsupportedOperationException()
+            item.toDraw = newDraw
         }
 
         override fun undoInternal(screen: AsciiScreen) {
-            throw UnsupportedOperationException()
+            item.toDraw = oldDraw
         }
     }
 
