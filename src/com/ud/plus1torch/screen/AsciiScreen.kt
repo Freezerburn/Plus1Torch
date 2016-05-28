@@ -162,6 +162,9 @@ infix fun Int.bitSet(other: Int): Boolean {
  * TODO: Load fonts in a framework-agnostic way.
  *  How do I even do this? libgdx uses pre-created files to create BitmapFonts rather than using Java fonts, for
  *  example. And it uses its own API to load the fonts from a resources folder, etc.
+ * TODO: Keep an internal list of where all the characters are so we only iterate over actual items.
+ *  Current implementation of render is to just loop over every possible item, which can be quite a bit if the
+ *  width and height is pretty large.
  *
  * @param width: Number of characters that can be stored left to right across the field.
  * @param height: Number of characters that can be stored up to down across the field.
@@ -482,6 +485,9 @@ internal sealed class QueuedAction {
     abstract internal fun run(screen: AsciiScreen);
     abstract fun undoInternal(screen: AsciiScreen);
 
+    /**
+     * Place a character into a layer.
+     */
     class PlacementAction(private val item: ItemData,
                           private val layer: Int) : QueuedAction() {
         var previousItems: Array<ItemData?>? = null
@@ -519,7 +525,6 @@ internal sealed class QueuedAction {
         }
 
         override fun undoInternal(screen: AsciiScreen) {
-            // TODO: Implement undoing a placed character.
             val placeLayer = screen.layers[layer]
             val previousItemsArray = previousItems ?: throw IllegalStateException("Cannot undo placement because previous items is somehow null.")
             for (w in 0..item.w-1) {
@@ -530,10 +535,14 @@ internal sealed class QueuedAction {
         }
     }
 
+    /**
+     * Remove a character from a layer.
+     */
     class RemoveAction(private val item: ItemData,
                        private val layer: Int) : QueuedAction() {
         override fun attempt(screen: AsciiScreen): Boolean {
-            return true
+            // TODO: Use the location of the item as a place to look for it in the layer
+            return screen.layers[layer].any { it === item }
         }
 
         override fun run(screen: AsciiScreen) {
@@ -545,7 +554,9 @@ internal sealed class QueuedAction {
         }
 
         override fun undoInternal(screen: AsciiScreen) {
-            screen.layers[layer].add(item);
+            // TODO: Refactor placement's run method into something outside the object so we don't have to allocate one here?
+            // Until then, hopefully the JVM will at least mostly optimize this.
+            QueuedAction.PlacementAction(item, layer).run(screen)
         }
     }
 
