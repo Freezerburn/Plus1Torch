@@ -344,8 +344,8 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     // slightly more sophisticated than just checking the moved-to square(s) for something inside them. (at least
     // I believe that to be the case, resolution of actions is yet to be implemented)
     // Is there a better way to handle this situation?
-    fun render(f: (CharDrawData) -> Unit) {
-        resolveActions()
+    fun render(handler: RenderHandler) {
+        resolveActions(handler)
 
         val charW = windowWidth / charactersDrawnX
         val charH = windowHeight / charactersDrawnY
@@ -353,14 +353,14 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
             for (x in cameraX..charactersDrawnX-1) {
                 for (y in cameraY..charactersDrawnY-1) {
                     it[get1d(x, y, width)]?.let {
-                        f(reusableDrawData(it, charW, charH))
+                        handler.render(reusableDrawData(it, charW, charH))
                     }
                 }
             }
         }
     }
 
-    private fun resolveActions() {
+    private fun resolveActions(handler: RenderHandler) {
         // TODO: Implement resolving queued actions for a screen.
         //  What order do things need to be resolved in to make this work correctly?
         //  What special considerations about actions need to be taken into account?
@@ -380,7 +380,20 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     }
 }
 
-public class PlacedItem(private val screen: AsciiScreen) {
+interface RenderHandler {
+    fun render(data: CharDrawData): Unit
+    fun actionFailure(failure: ActionFailure): Unit
+}
+
+class RenderHandlerAdapter : RenderHandler {
+    override fun render(data: CharDrawData) {
+    }
+
+    override fun actionFailure(failure: ActionFailure) {
+    }
+}
+
+class PlacedItem(private val screen: AsciiScreen) {
     lateinit internal var item: ItemData;
     internal var layer: Int = -1;
 
@@ -652,6 +665,10 @@ internal sealed class QueuedAction {
             throw UnsupportedOperationException()
         }
     }
+}
+
+sealed class ActionFailure {
+    class Movement(val data1: CharDrawData, val data2: CharDrawData)
 }
 
 data class BorderLine(val x1: Int, val y1: Int, val x2: Int, val y2: Int)
