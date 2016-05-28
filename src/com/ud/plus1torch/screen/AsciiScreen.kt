@@ -1,7 +1,6 @@
 package com.ud.plus1torch.screen
 
 import java.awt.Color
-import java.awt.Font
 import java.awt.geom.Line2D
 import java.util.*
 
@@ -285,7 +284,11 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         }
         else {
             for(i in 0..ScreenLayer.UI.layer) {
-                layers.add(ArrayList<ItemData?>(itemsPerLayer))
+                val newLayer = ArrayList<ItemData?>(itemsPerLayer)
+                layers.add(newLayer)
+                for (j in 0..itemsPerLayer) {
+                    newLayer.add(null)
+                }
             }
         }
     }
@@ -481,6 +484,8 @@ internal sealed class QueuedAction {
 
     class PlacementAction(private val item: ItemData,
                           private val layer: Int) : QueuedAction() {
+        var previousItems: Array<ItemData?>? = null
+
         override fun attempt(screen: AsciiScreen): Boolean {
             val placeLayer = screen.layers[layer]
             // Make sure to check every position over all the width/height of the character when checking if something
@@ -502,16 +507,26 @@ internal sealed class QueuedAction {
 
         override fun run(screen: AsciiScreen) {
             val placeLayer = screen.layers[layer]
+            val newPreviousItemsArray = Array<ItemData?>(item.w * item.h) { null }
+            previousItems = newPreviousItemsArray
             for (w in 0..item.w-1) {
                 for (h in 0..item.h-1) {
-                    placeLayer[get1d(item.x + w, item.y + h, screen.width)] = item
+                    val loc = get1d(item.x + w, item.y + h, screen.width)
+                    newPreviousItemsArray[get1d(w, h, item.w)] = placeLayer[loc]
+                    placeLayer[loc] = item
                 }
             }
         }
 
         override fun undoInternal(screen: AsciiScreen) {
             // TODO: Implement undoing a placed character.
-            throw UnsupportedOperationException()
+            val placeLayer = screen.layers[layer]
+            val previousItemsArray = previousItems ?: throw IllegalStateException("Cannot undo placement because previous items is somehow null.")
+            for (w in 0..item.w-1) {
+                for (h in 0..item.h-1) {
+                    placeLayer[get1d(item.x + w, item.y + h, screen.width)] = previousItemsArray[get1d(w, h, item.w)]
+                }
+            }
         }
     }
 
