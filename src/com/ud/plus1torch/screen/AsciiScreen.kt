@@ -336,6 +336,14 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         }
     }
 
+    // TODO: Change function parameter to be something that can handle multiple callbacks?
+    // So it would have something like: render, actionFail, etc.
+    // This would allow for an action such as movement to fail and communicate it back to the calling code.
+    // Movement cannot be immediately checked, and has to be done via a deferred resolve due to there being
+    // multiple things that could possibly be moving in a single frame. Resolving that will require something
+    // slightly more sophisticated than just checking the moved-to square(s) for something inside them. (at least
+    // I believe that to be the case, resolution of actions is yet to be implemented)
+    // Is there a better way to handle this situation?
     fun render(f: (CharDrawData) -> Unit) {
         resolveActions()
 
@@ -357,6 +365,15 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         //  What order do things need to be resolved in to make this work correctly?
         //  What special considerations about actions need to be taken into account?
         //   e.g.: If something is moved, it should be undone if it collides with something?
+        // TODO: Apply all actions to a "virtual" screen and resolve anything odd by comparing actual vs virtual?
+        //  Sorta like double-buffering a screen, but instead we're doing it to a layer of characters. This could
+        //  potentially be used to let every action immediately go through, and then resolve the end state of everything
+        //  happening at once. (e.g.: two things move, and it can be inferred based on their new positions that they
+        //  went "through" each other, necessitating a collision)
+        //  Would it be better to do that, or would it indeed be better to look at the actual actions that have been
+        //  queued and resolve from those?
+        //  I'll leave this around for now, but the first attempt at resolving actions will be by just using the
+        //  queue instead of something potentially fancier like the virtual screen idea.
         for (action in actionQueue) {
         }
         actionQueue.clear()
@@ -381,11 +398,11 @@ public class PlacedItem(private val screen: AsciiScreen) {
         set(v) = resize(dh = v - h)
 
     fun move(dx: Int = 0, dy: Int = 0) {
-        screen.actionQueue.add(QueuedAction.MovementAction(item, dx, dy))
+        screen.actionQueue.add(QueuedAction.MovementAction(item, layer, dx, dy))
     }
 
     fun moveAbsolute(x: Int = item.x, y: Int = item.y) {
-        screen.actionQueue.add(QueuedAction.MovementAction(item, x, y, absolute = true))
+        screen.actionQueue.add(QueuedAction.MovementAction(item, layer, x, y, absolute = true))
     }
 
     fun resize(dw: Int = 0, dh: Int = 0) {
@@ -575,24 +592,45 @@ internal sealed class QueuedAction {
         }
     }
 
-    class MovementAction(private val item: ItemData,
+    class MovementAction(private val item: ItemData, private val layer: Int,
                          private val dx: Int, private val dy: Int,
                          private val absolute: Boolean = false) : QueuedAction() {
+        val remove = RemoveAction(item, layer)
+        val place = PlacementAction(item, layer)
+        val oldX = item.x
+        val oldY = item.y
+        val newX = if (absolute) dx else item.x + dx
+        val newY = if (absolute) dy else item.y + dy
+
+        private fun setItemPosition() {
+            item.x = newX
+            item.y = newY
+        }
+
+        private fun resetItemPosition() {
+            item.x = oldX
+            item.y = oldY
+        }
+
         override fun attempt(screen: AsciiScreen): Boolean {
-            throw UnsupportedOperationException()
+            setItemPosition()
+            return remove.attempt(screen) && place.attempt(screen)
         }
 
         override fun undoInternal(screen: AsciiScreen) {
-            throw UnsupportedOperationException()
+            // Always make sure the position is in a consistent state before running any actions. We want to ensure
+            // that any oddities in when the various methods are called does not change how the action is run.
+            setItemPosition()
+            place.undoInternal(screen)
+            resetItemPosition()
+            remove.undoInternal(screen)
         }
 
         override fun run(screen: AsciiScreen) {
-            // TODO: Make sure to remove all old item placements before adding the new ones.
-            //  Likely it's not desirable to have a remove then a place queued instead of having a move, as that
-            //  might cause issues due to having two separate actions. Movement can also check that something can
-            //  move, and respond in some way based on the inability to move. (e.g.: attack a monster if you bump
-            //  into them)
-            throw UnsupportedOperationException()
+            resetItemPosition()
+            remove.run(screen)
+            setItemPosition()
+            place.run(screen)
         }
     }
 
