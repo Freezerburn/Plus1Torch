@@ -419,11 +419,11 @@ class PlacedItem(private val screen: AsciiScreen) {
     }
 
     fun resize(dw: Int = 0, dh: Int = 0) {
-        screen.actionQueue.add(QueuedAction.ResizeAction(item, dw, dh))
+        screen.actionQueue.add(QueuedAction.ResizeAction(item, layer, dw, dh))
     }
 
     fun resizeAbsolute(w: Int = item.w, h: Int = item.h) {
-        screen.actionQueue.add(QueuedAction.ResizeAction(item, w, h, absolute = true))
+        screen.actionQueue.add(QueuedAction.ResizeAction(item, layer, w, h, absolute = true))
     }
 
     fun remove() {
@@ -647,9 +647,51 @@ internal sealed class QueuedAction {
         }
     }
 
-    class ResizeAction(private val item: ItemData,
+    /**
+     * Resizes an item.
+     *
+     * When an item is becoming bigger, it will always attempt to center the newly-sized item on the original
+     * center. If it cannot be perfectly centered (e.g.: 1x1 to 2x2 cannot be perfectly centered, but a
+     * 1x1 to 3x3 can be), it will expand the size right and down. So for example:
+     *
+     * 1x1      2x2
+     * .#.  ->  .##
+     * ...      .##
+     *
+     * 1x1      3x3
+     * ...      ###
+     * .#.  ->  ###
+     * ...      ###
+     *
+     * When an item is becoming smaller, it will do the same as larger except in reverse. For example:
+     *
+     * 2x2      1x2
+     * .##  ->  .#.
+     * .##      .#.
+     *
+     * 2x2      2x1
+     * .##  ->  .##
+     * .##      ...
+     *
+     * 3x3      1x1
+     * ###      ...
+     * ###  ->  .#.
+     * ###      ...
+     *
+     * This action can fail if it attempts to resize an item such that it attempts to replace another item
+     * in the grid. When it's being resized, in essence the item is having itself placed in more/less spots
+     * in the layer.
+     */
+    class ResizeAction(private val item: ItemData, private val layer: Int,
                        private val dw: Int, private val dh: Int,
                        private val absolute: Boolean = false): QueuedAction() {
+        val remove = RemoveAction(item, layer)
+        val place = PlacementAction(item, layer)
+        val newW = if (absolute) dw else item.w + dw
+        val newH = if (absolute) dh else item.h + dh
+        val oldW = item.w
+        val oldH = item.h
+
         override fun attempt(screen: AsciiScreen): Boolean {
             throw UnsupportedOperationException()
         }
