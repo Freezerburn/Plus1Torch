@@ -11,25 +11,25 @@ enum class ScreenLayer(val layer: Int) {
     UI(2)
 }
 
-public val TEXT_BLINKING_DELAY_ARG_NAME = "BlinkingDelayMilliseconds"
+val TEXT_BLINKING_DELAY_ARG_NAME = "BlinkingDelayMilliseconds"
 private val TEXT_BLINKING_DELAY_DEFAULT: Int = 500
-public val TEXT_BLINKING = 0x0001
+val TEXT_BLINKING = 0x0001
 
 // Since this engine isn't ACTUALLY a terminal, we can do things that aren't possible to do in a terminal, such as put
 // borders around a character.
 // Can accept an extra attribute argument with the color a border should be drawn as. If not set, then the background
 // color will be used as the default.
-public val TEXT_BORDER_COLOR_RIGHT_ARG_NAME = "BorderColorArgumentRight"
-public val TEXT_BORDER_COLOR_LEFT_ARG_NAME = "BorderColorArgumentLeft"
-public val TEXT_BORDER_COLOR_TOP_ARG_NAME = "BorderColorArgumentTop"
-public val TEXT_BORDER_COLOR_BOTTOM_ARG_NAME = "BorderColorArgumentBottom"
-public val TEXT_BORDER_COLOR_ALL_ARG_NAME = "BorderColorArgumentAll"
+val TEXT_BORDER_COLOR_RIGHT_ARG_NAME = "BorderColorArgumentRight"
+val TEXT_BORDER_COLOR_LEFT_ARG_NAME = "BorderColorArgumentLeft"
+val TEXT_BORDER_COLOR_TOP_ARG_NAME = "BorderColorArgumentTop"
+val TEXT_BORDER_COLOR_BOTTOM_ARG_NAME = "BorderColorArgumentBottom"
+val TEXT_BORDER_COLOR_ALL_ARG_NAME = "BorderColorArgumentAll"
 private val TEXT_BORDER_COLOR_DEFAULT = Color.WHITE
-public val TEXT_BORDER_RIGHT = 0x0002
-public val TEXT_BORDER_LEFT = 0x0004
-public val TEXT_BORDER_TOP = 0x0008
-public val TEXT_BORDER_BOTTOM = 0x0010
-public val TEXT_BORDER_ALL = TEXT_BORDER_RIGHT or TEXT_BORDER_LEFT or TEXT_BORDER_TOP or TEXT_BORDER_BOTTOM
+val TEXT_BORDER_RIGHT = 0x0002
+val TEXT_BORDER_LEFT = 0x0004
+val TEXT_BORDER_TOP = 0x0008
+val TEXT_BORDER_BOTTOM = 0x0010
+val TEXT_BORDER_ALL = TEXT_BORDER_RIGHT or TEXT_BORDER_LEFT or TEXT_BORDER_TOP or TEXT_BORDER_BOTTOM
 
 // TODO: Write code that automatically builds fancy walls when placing characters.
 //  This is basically using the various wall-like code points in CP437 to create a nice-looking wall when placing
@@ -43,11 +43,11 @@ public val TEXT_BORDER_ALL = TEXT_BORDER_RIGHT or TEXT_BORDER_LEFT or TEXT_BORDE
 //    #     ║
 //    ## -> ╚═
 //  etc.
-public val TEXT_AUTO_FANCY_WALL = 0x0020
-public val TEXT_FANCY_WALL_PREFER_SINGLE_ARG_NAME = "FancyWallPreferSingle"
-public val TEXT_FANCY_WALL_PREFER_DOUBLE_ARG_NAME = "FancyWallPreferDouble"
-public val TEXT_FANCY_WALL_ONLY_BORDERS_ARG_NAME = "FancyWallBorderOnly"
-public val TEXT_FANCY_WALL_INCLUDE_BORDERS_ARG_NAME = "FancyWallIncludeBorders"
+val TEXT_AUTO_FANCY_WALL = 0x0020
+val TEXT_FANCY_WALL_PREFER_SINGLE_ARG_NAME = "FancyWallPreferSingle"
+val TEXT_FANCY_WALL_PREFER_DOUBLE_ARG_NAME = "FancyWallPreferDouble"
+val TEXT_FANCY_WALL_ONLY_BORDERS_ARG_NAME = "FancyWallBorderOnly"
+val TEXT_FANCY_WALL_INCLUDE_BORDERS_ARG_NAME = "FancyWallIncludeBorders"
 
 /**
  * Every character in Code Page 437, in the order they are defined in. Excluding the first character, as there
@@ -57,7 +57,7 @@ public val TEXT_FANCY_WALL_INCLUDE_BORDERS_ARG_NAME = "FancyWallIncludeBorders"
  * should be used as a basis for building the UI/play area for a game.
  * TODO: Define some index values for commonly-used characters, such as walls and fancy walls.
  */
-public val CP437 = charArrayOf(
+val CP437 = charArrayOf(
         ' ',      '\u263A', '\u263B', '\u2665', '\u2666', '\u2663', '\u2660', '\u2022',
         '\u25D8', '\u25CB', '\u25D9', '\u2642', '\u2642', '\u2640', '\u266A', '\u266B',
         '\u263C', '\u25BA', '\u25C4', '\u2195', '\u203C', '\u00B6', '\u00A7', '\u25AC',
@@ -94,11 +94,11 @@ public val CP437 = charArrayOf(
 )
 
 fun <T> ArrayList<T>.pop(): T? {
-    return if (this.size > 0) this.removeAt(this.size - 1) else null;
+    return if (this.size > 0) this.removeAt(this.size - 1) else null
 }
 
 fun get1d(x: Int, y: Int, stride: Int): Int {
-    return x + y * stride;
+    return x + y * stride
 }
 
 infix fun Int.bitSet(other: Int): Boolean {
@@ -178,12 +178,12 @@ infix fun Int.bitSet(other: Int): Boolean {
 class AsciiScreen(internal var width: Int, internal var height: Int,
                   charactersDrawnX: Int, charactersDrawnY: Int,
                   renderWidth: Int, renderHeight: Int,
-                  public val uiOnly: Boolean = false,
+                  val uiOnly: Boolean = false,
                   internal val debug: Boolean = false) {
     /**
      * The number of characters that will be drawn from left to right in this AsciiScreen.
      */
-    public var charactersDrawnX = charactersDrawnX
+    var charactersDrawnX = charactersDrawnX
         /**
          * Change the number of characters that are drawn on the screen from left to right. This will change how
          * big each character gets drawn in the game window.
@@ -195,7 +195,7 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     /**
      * The number of characters that will be drawn from top to bottom in this AsciiScreen.
      */
-    public var charactersDrawnY = charactersDrawnY
+    var charactersDrawnY = charactersDrawnY
         /**
          * Change the number of characters that are drawn on the screen from top to bottom. This will change how
          * big each character gets drawn in the game window.
@@ -207,7 +207,7 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     /**
      * The width of the area of the screen that this AsciiScreen will be drawn into. This can be changed.
      */
-    public var windowWidth = renderWidth
+    var windowWidth = renderWidth
         /**
          * Change the width in pixels that this screen is drawing into. This will change how big each characters is
          * that gets drawn in the game window.
@@ -219,7 +219,7 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
     /**
      * The height of the area of the screen that this AsciiScreen will be drawn into. This can be changed.
      */
-    public var windowHeight = renderHeight
+    var windowHeight = renderHeight
         /**
          * Change the height in pixels that this screen is drawing into. This will change how big each characters is
          * that gets drawn in the game window.
@@ -311,15 +311,15 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
 
         // TODO: Handle attributes and their arguments.
 
-        val item = pooledItems.pop() ?: ItemData();
-        var wrapper = PlacedItem(this);
+        val item = pooledItems.pop() ?: ItemData()
+        var wrapper = PlacedItem(this)
         val layerInt = if (uiOnly) 0 else layer.layer
-        wrapper.item = item;
-        wrapper.layer = layerInt;
+        wrapper.item = item
+        wrapper.layer = layerInt
         actionQueue.add(QueuedAction.PlacementAction(
                 item(c, x, y, w, h, fg, bg, userData, attributes, attributeArgs, debug), layerInt
-        ));
-        return wrapper;
+        ))
+        return wrapper
     }
 
     fun clear() {
@@ -390,8 +390,8 @@ class RenderHandlerAdapter : RenderHandler {
 }
 
 class PlacedItem(private val screen: AsciiScreen) {
-    lateinit internal var item: ItemData;
-    internal var layer: Int = -1;
+    lateinit internal var item: ItemData
+    internal var layer: Int = -1
 
     var x: Int
         get() = item.x
@@ -427,33 +427,33 @@ class PlacedItem(private val screen: AsciiScreen) {
     }
 }
 
-public class CharDrawData {
-    public var c: Char = ' '
+class CharDrawData {
+    var c: Char = ' '
         internal set
 
-    public var x: Int = 0
+    var x: Int = 0
         internal set
 
-    public var y: Int  = 0
+    var y: Int  = 0
         internal set
 
-    public var w: Int = 0
+    var w: Int = 0
         internal set
 
-    public var h: Int = 0
+    var h: Int = 0
         internal set
 
-    public var fg: Color = Color.WHITE
+    var fg: Color = Color.WHITE
         internal set
 
-    public var bg: Color = Color.BLACK
+    var bg: Color = Color.BLACK
         internal set
 
-    public var borders: Array<Line2D> = arrayOf()
+    var borders: Array<Line2D> = arrayOf()
         get() = field.copyOf() // Ensure internal array isn't mucked about with.
         internal set
 
-    public var userData: Any? = null
+    var userData: Any? = null
         internal set
 
     internal operator fun invoke(item: ItemData, w: Int, h: Int): CharDrawData {
@@ -487,29 +487,29 @@ public class CharDrawData {
 //  a chance to put something into another location. (e.g.: if trying to generate a room or an item needs a location to
 //  be placed, but has to do a couple iterations to figure out where it needs to be placed)
 internal sealed class QueuedAction {
-    private var hasRun = false;
+    private var hasRun = false
 
-    final fun invoke(screen: AsciiScreen) {
+    fun invoke(screen: AsciiScreen) {
         if(hasRun) {
-            throw IllegalStateException("Cannot run an action that has already been run.");
+            throw IllegalStateException("Cannot run an action that has already been run.")
         }
-        run(screen);
-        hasRun = true;
+        run(screen)
+        hasRun = true
     }
-    final fun undo(screen: AsciiScreen) {
+    fun undo(screen: AsciiScreen) {
         if(!hasRun) {
-            throw IllegalStateException("Cannot undo an action that has not been run.");
+            throw IllegalStateException("Cannot undo an action that has not been run.")
         }
-        undoInternal(screen);
+        undoInternal(screen)
         // We can run an action again after it has been undone, since it will be like it never happened.
         // Hopefully this doesn't have to be made use of very often.
         // But I could see a use in backing a change out temporarily for some reason.
         hasRun = false
     }
 
-    abstract fun attempt(screen: AsciiScreen): Boolean;
-    abstract internal fun run(screen: AsciiScreen);
-    abstract fun undoInternal(screen: AsciiScreen);
+    abstract fun attempt(screen: AsciiScreen): Boolean
+    abstract internal fun run(screen: AsciiScreen)
+    abstract fun undoInternal(screen: AsciiScreen)
 
     /**
      * Place a character into a layer.
@@ -575,7 +575,7 @@ internal sealed class QueuedAction {
             var found = false
             screen.layers[layer].replaceAll { if (it === item) { found = true; null } else it }
             if(screen.debug && !found) {
-                throw IllegalStateException("Cannot remove '$item' which does not exist.");
+                throw IllegalStateException("Cannot remove '$item' which does not exist.")
             }
         }
 
@@ -736,7 +736,7 @@ internal class ItemData(var toDraw: Char,
                         newFg: Color, newBg: Color, newUserData: Any?,
                         attributes: Int, attributeArgs: Map<String, Any?>,
                         debug: Boolean): ItemData {
-        toDraw = newDraw;
+        toDraw = newDraw
         x = newX
         y = newY
         w = newW
@@ -745,7 +745,7 @@ internal class ItemData(var toDraw: Char,
         bg = newBg
         userData = newUserData
         buildAttributes(attributes, attributeArgs, debug)
-        return this;
+        return this
     }
 
     private fun buildAttributes(attributes: Int, attributeArgs: Map<String, Any?>, debug: Boolean) {
