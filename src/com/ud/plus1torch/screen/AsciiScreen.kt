@@ -4,10 +4,6 @@ import java.awt.Color
 import java.awt.geom.Line2D
 import java.util.*
 
-/**
- * Created by vince_000 on 11/23/2015.
- */
-
 
 enum class ScreenLayer(val layer: Int) {
     BACKGROUND(0),
@@ -62,7 +58,7 @@ public val TEXT_FANCY_WALL_INCLUDE_BORDERS_ARG_NAME = "FancyWallIncludeBorders"
  * TODO: Define some index values for commonly-used characters, such as walls and fancy walls.
  */
 public val CP437 = charArrayOf(
-        ' ', '\u263A', '\u263B', '\u2665', '\u2666', '\u2663', '\u2660', '\u2022',
+        ' ',      '\u263A', '\u263B', '\u2665', '\u2666', '\u2663', '\u2660', '\u2022',
         '\u25D8', '\u25CB', '\u25D9', '\u2642', '\u2642', '\u2640', '\u266A', '\u266B',
         '\u263C', '\u25BA', '\u25C4', '\u2195', '\u203C', '\u00B6', '\u00A7', '\u25AC',
         '\u21A8', '\u2191', '\u2193', '\u2192', '\u2190', '\u221F', '\u2194', '\u25B2',
