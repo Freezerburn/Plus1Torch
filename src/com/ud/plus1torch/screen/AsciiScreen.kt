@@ -669,6 +669,11 @@ internal sealed class QueuedAction {
      * .##  ->  .##
      * .##      ...
      *
+     * 3x3      2x2
+     * ###      ##.
+     * ###  ->  ##.
+     * ###      ...
+     *
      * 3x3      1x1
      * ###      ...
      * ###  ->  .#.
@@ -687,20 +692,44 @@ internal sealed class QueuedAction {
         val newH = if (absolute) dh else item.h + dh
         val oldW = item.w
         val oldH = item.h
+        val oldX = item.x
+        val oldY = item.y
+        val newX = oldX + (oldW - newW) / 2
+        val newY = oldY + (oldH - newH) / 2
+
+        private fun setItemPosition() {
+            item.x = newX
+            item.y = newY
+            item.w = newW
+            item.h = newH
+        }
+
+        private fun resetItemPosition() {
+            item.x = oldX
+            item.y = oldY
+            item.w = oldW
+            item.h = oldH
+        }
 
         override fun attempt(screen: AsciiScreen): Boolean {
-            throw UnsupportedOperationException()
+            resetItemPosition()
+            val removeAttempt = remove.attempt(screen)
+            setItemPosition()
+            return place.attempt(screen) && removeAttempt
         }
 
         override fun undoInternal(screen: AsciiScreen) {
-            throw UnsupportedOperationException()
+            setItemPosition()
+            place.undoInternal(screen)
+            resetItemPosition()
+            remove.undoInternal(screen)
         }
 
         override fun run(screen: AsciiScreen) {
-            // TODO: Remove old item references before resizing.
-            //  Necessary if something becomes smaller. We don't want old references to an item in places that it
-            //  doesn't exist anymore due to becoming smaller.
-            throw UnsupportedOperationException()
+            resetItemPosition()
+            remove.run(screen)
+            setItemPosition()
+            place.run(screen)
         }
     }
 }
