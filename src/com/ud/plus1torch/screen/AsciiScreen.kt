@@ -332,6 +332,14 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         }
     }
 
+    // TODO: Create a way to render without having the internal code call a handler.
+    // This would be something like: resolve -> Iterable<ActionError> and render -> Iterable<DrawData>
+    // Iterable could be used in any standard for loop, and it would allow the user to "pull" the errors
+    // and data needed to render instead of having the code be a framework-style "I'll call you maybe"
+    // kind of thing. This leaves the user in more control instead of having the framework infest their
+    // code in ways that are much harder to detangle or wrap in a layer or something. It's pretty much
+    // always preferable to leave the caller in control.
+
     // TODO: Change function parameter to be something that can handle multiple callbacks?
     // So it would have something like: render, actionFail, etc.
     // This would allow for an action such as movement to fail and communicate it back to the calling code.
@@ -371,6 +379,9 @@ class AsciiScreen(internal var width: Int, internal var height: Int,
         //  I'll leave this around for now, but the first attempt at resolving actions will be by just using the
         //  queue instead of something potentially fancier like the virtual screen idea.
         for (action in actionQueue) {
+            if (!action.attempt(this)) {
+                handler.actionFailure(ActionFailure.Movement(CharDrawData(), CharDrawData()))
+            }
         }
         actionQueue.clear()
     }
@@ -427,7 +438,11 @@ class PlacedItem(private val screen: AsciiScreen) {
     }
 }
 
-class CharDrawData {
+class CharDrawData() {
+    internal constructor(item: ItemData) : this() {
+        this(item, 1, 1)
+    }
+
     var c: Char = ' '
         internal set
 
@@ -510,6 +525,8 @@ internal sealed class QueuedAction {
     abstract fun attempt(screen: AsciiScreen): Boolean
     abstract internal fun run(screen: AsciiScreen)
     abstract fun undoInternal(screen: AsciiScreen)
+    abstract val pre: CharDrawData
+    abstract val post: CharDrawData
 
     /**
      * Place a character into a layer.
@@ -559,6 +576,12 @@ internal sealed class QueuedAction {
                 }
             }
         }
+
+        override val pre: CharDrawData
+            get() = CharDrawData(item)
+
+        override val post: CharDrawData
+            get() = CharDrawData(item)
     }
 
     /**
@@ -584,10 +607,21 @@ internal sealed class QueuedAction {
             // Until then, hopefully the JVM will at least mostly optimize this.
             QueuedAction.PlacementAction(item, layer).run(screen)
         }
+
+        override val pre: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
+
+        override val post: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
     }
 
     class DrawableChangeAction(private val item: ItemData,
                                private val newDraw: Char, private val oldDraw: Char) : QueuedAction() {
+        override val pre: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
+        override val post: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
+
         override fun attempt(screen: AsciiScreen): Boolean {
             return true
         }
@@ -604,6 +638,10 @@ internal sealed class QueuedAction {
     class MovementAction(private val item: ItemData, private val layer: Int,
                          private val dx: Int, private val dy: Int,
                          private val absolute: Boolean = false) : QueuedAction() {
+        override val pre: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
+        override val post: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
         val remove = RemoveAction(item, layer)
         val place = PlacementAction(item, layer)
         val oldX = item.x
@@ -686,6 +724,10 @@ internal sealed class QueuedAction {
     class ResizeAction(private val item: ItemData, private val layer: Int,
                        private val dw: Int, private val dh: Int,
                        private val absolute: Boolean = false): QueuedAction() {
+        override val pre: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
+        override val post: CharDrawData
+            get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
         val remove = RemoveAction(item, layer)
         val place = PlacementAction(item, layer)
         val newW = if (absolute) dw else item.w + dw
@@ -735,7 +777,7 @@ internal sealed class QueuedAction {
 }
 
 sealed class ActionFailure {
-    class Movement(val data1: CharDrawData, val data2: CharDrawData)
+    class Movement(val pre: CharDrawData, val post: CharDrawData) : ActionFailure()
 }
 
 data class BorderLine(val x1: Int, val y1: Int, val x2: Int, val y2: Int)
